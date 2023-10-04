@@ -22,16 +22,15 @@ public class Main {
 
     static double scaleX = 1;
     static double scaleY = 1;
-    static double pixel = 0.6;
 
     static boolean ascii = false;
-    static boolean autoScale = true;
     static boolean reply = false;
 
     public static void main(String[] args) throws URISyntaxException, IOException {
         parseArgs(args);
 
         try {
+            System.out.println("Splitting gif");
             for (int v = 0; v < reader.getNumImages(true); v++) {
                 NamedNodeMap attributes = reader.getImageMetadata(v).getAsTree("javax_imageio_gif_image_1.0").getChildNodes().item(0).getAttributes();
                 thumb.getGraphics().drawImage(reader.read(v), Integer.parseInt(attributes.getNamedItem("imageLeftPosition").getNodeValue()), Integer.parseInt(attributes.getNamedItem("imageTopPosition").getNodeValue()), null);
@@ -42,27 +41,7 @@ public class Main {
                 image = new AffineTransformOp(scale, AffineTransformOp.TYPE_BILINEAR).filter(thumb, image);
 
 
-                StringBuilder builder = new StringBuilder();
-
-                int width = image.getWidth();
-                int height = image.getHeight();
-
-                for (int i = 0; i < height; i++) {
-                    for (int j = 0; j < width; j++) {
-                        int rgb = image.getRGB(j, i);
-                        int alpha = ((rgb & 0xff000000) >>> 24) / 255;
-                        int red = (rgb & 0x00ff0000) >>> 16;
-                        int green = (rgb & 0x0000ff00) >>> 8;
-                        int blue = rgb & 0x000000ff;
-
-                        var x = "%s".formatted(ascii ? palette.charAt((red + green + blue) / 3 * alpha) : "\033[38;2;%s;%s;%sm#".formatted(red, green, blue));
-                        builder.append(x);
-
-                    }
-                    builder.append('\n');
-                }
-
-                output.add(builder.toString());
+                parseImage(image);
             }
             PrintWriter writer = new PrintWriter(System.out, false);
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
@@ -86,6 +65,7 @@ public class Main {
     }
 
     static void parseArgs(String[] a) throws URISyntaxException, IOException {
+        System.out.println("Loading image");
         if (a[0].startsWith("http")) {
             thumb = ImageIO.read(new URI(a[0]).toURL());
             reader.setInput(ImageIO.createImageInputStream(new URI(a[0]).toURL().openStream()));
@@ -95,20 +75,56 @@ public class Main {
         }
         for (int i = 1; i < a.length; i++) {
             switch (a[i]) {
-                case "--auto_scale" -> autoScale = Boolean.parseBoolean(a[i + 1]);
                 case "--width" -> scaleX = (double) Integer.parseInt(a[i + 1]) / thumb.getWidth();
                 case "--height" -> scaleY = (double) Integer.parseInt(a[i + 1]) / thumb.getHeight();
                 case "--scale_x" -> scaleX = Double.parseDouble(a[i + 1]);
                 case "--scale_y" -> scaleY = Double.parseDouble(a[i + 1]);
-                case "--pixel" -> pixel = Double.parseDouble(a[i + 1]);
-                case "--reply" -> reply = true;
+                case "--size" -> {
+                    scaleX = (double) Integer.parseInt(a[i + 1]) / thumb.getWidth();
+                    scaleY = (double) Integer.parseInt(a[i + 2]) / thumb.getHeight();
+                }
+                case "--repeat" -> reply = true;
                 case "--ascii" -> {
                     ascii = true;
                     palette = a[i + 1];
                 }
+                case "-h", "-help", "--help" -> System.out.println("""
+                        usage: java Main <URI/URL>
+                                                
+                        options:
+                            --width <value>                   set image width(chars)
+                            --height <value>                  set image width(chars)
+                            --scale_x <value>                 set image x scale
+                            --scale_y <value>                 set image y scale
+                            --size <width, height>            set image width and height
+                            --repeat <true/false              reply gif after end
+                            --ascii <256-char palette>        output ascii art with defined palette
+                """);
             }
         }
-        if (scaleX == 1 && autoScale) scaleX = scaleX * scaleY * pixel;
-        else if (scaleY == 1 && autoScale) scaleY = scaleY * scaleX * pixel;
+    }
+
+    static void parseImage(BufferedImage image) {
+        StringBuilder builder = new StringBuilder();
+
+        int width = image.getWidth();
+        int height = image.getHeight();
+
+        for (int i = 0; i < height; i++) {
+            for (int j = 0; j < width; j++) {
+                int rgb = image.getRGB(j, i);
+                int alpha = ((rgb & 0xff000000) >>> 24) / 255;
+                int red = (rgb & 0x00ff0000) >>> 16;
+                int green = (rgb & 0x0000ff00) >>> 8;
+                int blue = rgb & 0x000000ff;
+
+                var x = "%s".formatted(ascii ? palette.charAt((red + green + blue) / 3 * alpha) : "\033[38;2;%s;%s;%sm#".formatted(red, green, blue));
+                builder.append(x);
+
+            }
+            builder.append('\n');
+        }
+
+        output.add(builder.toString());
     }
 }
