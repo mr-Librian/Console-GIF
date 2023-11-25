@@ -25,6 +25,18 @@ public class Main {
 
     static boolean ascii = false;
     static boolean reply = false;
+    static final String usage = """
+                usage: java Main <URI/URL>
+                                        
+                options:
+                    --width <value>                   set image width(chars)
+                    --height <value>                  set image width(chars)
+                    --scale_x <value>                 set image x scale
+                    --scale_y <value>                 set image y scale
+                    --size <width, height>            set image width and height
+                    --repeat <true/false>             reply gif after end
+                    --ascii <256-char palette>        output ascii art with defined palette
+                """;
 
     public static void main(String[] args) throws URISyntaxException, IOException {
         parseArgs(args);
@@ -39,7 +51,6 @@ public class Main {
                 AffineTransform scale = new AffineTransform();
                 scale.scale(scaleX, scaleY);
                 image = new AffineTransformOp(scale, AffineTransformOp.TYPE_BILINEAR).filter(thumb, image);
-
 
                 parseImage(image);
             }
@@ -65,11 +76,15 @@ public class Main {
     }
 
     static void parseArgs(String[] a) throws URISyntaxException, IOException {
-        System.out.println("Loading image");
         if (a[0].startsWith("http")) {
+            System.out.println("Loading image");
             thumb = ImageIO.read(new URI(a[0]).toURL());
             reader.setInput(ImageIO.createImageInputStream(new URI(a[0]).toURL().openStream()));
+        } else if (a[0].equals("--help") || a[0].equals("-h") || a[0].equals("-help")) {
+            System.out.println(usage);
+            System.exit(0);
         } else {
+            System.out.println("Loading image");
             thumb = ImageIO.read(new File(a[0]));
             reader.setInput(ImageIO.createImageInputStream(new File(a[0])));
         }
@@ -88,18 +103,10 @@ public class Main {
                     ascii = true;
                     palette = a[i + 1];
                 }
-                case "-h", "-help", "--help" -> System.out.println("""
-                        usage: java Main <URI/URL>
-                                                
-                        options:
-                            --width <value>                   set image width(chars)
-                            --height <value>                  set image width(chars)
-                            --scale_x <value>                 set image x scale
-                            --scale_y <value>                 set image y scale
-                            --size <width, height>            set image width and height
-                            --repeat <true/false              reply gif after end
-                            --ascii <256-char palette>        output ascii art with defined palette
-                """);
+                case "-h", "-help", "--help" -> {
+                    System.out.println(usage);
+                    System.exit(0);
+                }
             }
         }
     }
